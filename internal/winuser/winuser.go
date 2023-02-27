@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"reflect"
+	"strings"
 	"unsafe"
 
 	"github.com/christowolf/usb-event/internal/message"
@@ -90,7 +91,10 @@ func readDeviceInfo(pDevInfo uintptr) (types.DWORD, windows.GUID, string, error)
 	s2.Data = pDevInfo + unsafe.Sizeof(devInfo)
 	s2.Len = int(uint32(devInfo.size) - uint32(unsafe.Sizeof(devInfo)))
 	s2.Cap = int(uint32(devInfo.size) - uint32(unsafe.Sizeof(devInfo)))
-	name := string(devName)
+	name := strings.ReplaceAll(string(devName), "\x00", "")
+	name = strings.Replace(name, `\\?\`, "", 1)
+	name = strings.Replace(name, "#", `\`, 2)
+	name = strings.Split(name, "#")[0]
 	// Return all relevant data.
 	return devInfo.deviceType, devInfo.classGuid, name, nil
 }
