@@ -24,19 +24,27 @@ func Register() (*Notifier, error) {
 	// The following is based on
 	// https://github.com/hallazzang/go-windows-programming/blob/ff0b400d8c7ba888340412472d92765a8412dc0d/example/gui/basic/main.go#L51.
 	inst := win.GetModuleHandle(nil)
+	cn, err := syscall.UTF16PtrFromString("usbeventWindow")
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert window class name to UTF16: %w", err)
+	}
 	wc := win.WNDCLASSEX{
 		HInstance:     inst,
 		LpfnWndProc:   cb,
-		LpszClassName: syscall.StringToUTF16Ptr("testClass"),
+		LpszClassName: cn,
 	}
 	wc.CbSize = uint32(unsafe.Sizeof(wc))
 	if win.RegisterClassEx(&wc) == 0 {
 		return nil, fmt.Errorf("failed to register window class: %w", syscall.GetLastError())
 	}
+	wName, err := syscall.UTF16PtrFromString("usbevent.exe")
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert window name to UTF16: %w", err)
+	}
 	wdw := win.CreateWindowEx(
 		0,
 		wc.LpszClassName,
-		syscall.StringToUTF16Ptr("usbevent.exe"),
+		wName,
 		win.WS_MINIMIZE|win.WS_OVERLAPPEDWINDOW,
 		win.CW_USEDEFAULT,
 		win.CW_USEDEFAULT,
@@ -49,7 +57,7 @@ func Register() (*Notifier, error) {
 	if wdw == 0 {
 		return nil, fmt.Errorf("failed to create window: %w", syscall.GetLastError())
 	}
-	err := user32.RegisterDeviceNotificationW(windows.Handle(wdw), user32.DEVICE_NOTIFY_WINDOW_HANDLE)
+	err = user32.RegisterDeviceNotificationW(windows.Handle(wdw), user32.DEVICE_NOTIFY_WINDOW_HANDLE)
 	if err != nil {
 		return nil, fmt.Errorf("failed device notification registration: %w", err)
 	}
