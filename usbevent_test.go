@@ -19,5 +19,4 @@ func ExampleRegister() {
 		}
 	}()
 	n.Run()
-	// Output:
 }
