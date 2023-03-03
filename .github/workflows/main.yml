@@ -46,7 +46,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          args: --config ./.github/configs/.golangci.yml
+          args: --config ./.github/configs/.golangci.yml -v
           only-new-issues: false
           skip-pkg-cache: true
           skip-build-cache: true
