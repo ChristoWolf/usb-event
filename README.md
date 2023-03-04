@@ -18,6 +18,6 @@ go get github.com/christowolf/usb-event
 
 ## Usage
 
-The API aims to be very, so
+The API aims to be very simple, so
 [this example](https://github.com/ChristoWolf/usb-event/blob/main/usbevent_test.go)
 should be enough to get you started.
