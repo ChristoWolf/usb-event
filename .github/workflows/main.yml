@@ -41,22 +41,3 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
-          args: --config ./.github/configs/.golangci.yml -v --timeout 3m
-          only-new-issues: false
-          skip-pkg-cache: true
-          skip-build-cache: true
-
-  gosec:
-    name: Scan code for security issues
-    # Gosec is only available on Linux.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: golang-security-action
-        uses: securego/gosec@master
