@@ -9,8 +9,7 @@ import (
 func ExampleRegister() {
 	n, err := usbevent.Register()
 	if err != nil {
-		log.Printf("registration failed: %v\n", err)
-		return
+		log.Fatalf("registration failed: %v\n", err)
 	}
 	go func() {
 		for e := range n.Channel {
