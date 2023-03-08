@@ -9,5 +9,4 @@ issues:
 linters:
   enable:
     - gosec
-    - gofmt
     - goimports
