@@ -13,8 +13,7 @@ func ExampleRegister() {
 	}
 	go func() {
 		for e := range n.Channel {
-			log.Printf("%v\n\n", e)
-			log.Printf("Device name: %s\n\n", e.DeviceName)
+			log.Printf("%+v\n\n", e)
 		}
 	}()
 	n.Run()

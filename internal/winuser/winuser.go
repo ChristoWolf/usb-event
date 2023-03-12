@@ -3,6 +3,7 @@ package winuser
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"strings"
 	"unsafe"
@@ -45,9 +46,15 @@ func (n *Notifier) WndProc(hwnd windows.HWND, msg types.DWORD, wParam, lParam ui
 	case message.WM_DEVICECHANGE:
 		switch wParam {
 		case uintptr(message.DBT_DEVICEARRIVAL):
+			defer func() {
+				if r := recover(); r != nil {
+					n.Channel <- EventInfo{0, windows.GUID{}, "unknown error", Arrival}
+				}
+			}()
 			dType, guid, name, err := readDeviceInfo(lParam)
 			if err != nil {
-				panic(err)
+				n.Channel <- EventInfo{0, windows.GUID{}, "error: failed to read device information", Arrival}
+				break
 			}
 			n.Channel <- EventInfo{dType, guid, name, Arrival}
 		}
@@ -62,10 +69,10 @@ func readDeviceInfo(pDevInfo uintptr) (types.DWORD, windows.GUID, string, error)
 	var devInfo deviceInfo
 	var devInfoBytes []byte
 	// Do some pointer arithmetic to align the struct.
-	s1 := (*reflect.SliceHeader)(unsafe.Pointer(&devInfoBytes))
-	s1.Data = pDevInfo
-	s1.Len = int(uint32(unsafe.Sizeof(devInfo)))
-	s1.Cap = s1.Len
+	b := (*reflect.SliceHeader)(unsafe.Pointer(&devInfoBytes))
+	b.Data = pDevInfo
+	b.Len = int(uint32(unsafe.Sizeof(devInfo)))
+	b.Cap = b.Len
 	// Read the binary data.
 	r := bytes.NewReader(devInfoBytes)
 	// Windows is little endian.
@@ -86,12 +93,18 @@ func readDeviceInfo(pDevInfo uintptr) (types.DWORD, windows.GUID, string, error)
 		return types.DWORD(0), windows.GUID{}, "", err
 	}
 	// Read the device name.
-	var devName []byte
-	s2 := (*reflect.SliceHeader)(unsafe.Pointer(&devName))
-	s2.Data = pDevInfo + unsafe.Sizeof(devInfo)
-	s2.Len = int(uint32(devInfo.size) - uint32(unsafe.Sizeof(devInfo)))
-	s2.Cap = int(uint32(devInfo.size) - uint32(unsafe.Sizeof(devInfo)))
-	name := strings.ReplaceAll(string(devName), "\x00", "")
+	// Based on (6) in https://pkg.go.dev/unsafe#Pointer.
+	var devName string
+	s := (*reflect.StringHeader)(unsafe.Pointer(&devName))
+	s.Data = pDevInfo + unsafe.Sizeof(devInfo)
+	read := uint32(devInfo.size)
+	size := uint32(unsafe.Sizeof(devInfo))
+	if read < size {
+		err = fmt.Errorf("read %d bytes, expected at least %d", read, size)
+		return types.DWORD(0), windows.GUID{}, "", err
+	}
+	s.Len = int(read - size)
+	name := strings.ReplaceAll(devName, "\x00", "")
 	name = strings.Replace(name, `\\?\`, "", 1)
 	name = strings.Replace(name, "#", `\`, 2)
 	name = strings.Split(name, "#")[0]
