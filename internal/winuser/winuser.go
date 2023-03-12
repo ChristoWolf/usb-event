@@ -3,6 +3,7 @@ package winuser
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"strings"
 	"unsafe"
@@ -45,9 +46,15 @@ func (n *Notifier) WndProc(hwnd windows.HWND, msg types.DWORD, wParam, lParam ui
 	case message.WM_DEVICECHANGE:
 		switch wParam {
 		case uintptr(message.DBT_DEVICEARRIVAL):
+			defer func() {
+				if r := recover(); r != nil {
+					n.Channel <- EventInfo{0, windows.GUID{}, "unknown error", Arrival}
+				}
+			}()
 			dType, guid, name, err := readDeviceInfo(lParam)
 			if err != nil {
-				panic(err)
+				n.Channel <- EventInfo{0, windows.GUID{}, "error: failed to read device information", Arrival}
+				break
 			}
 			n.Channel <- EventInfo{dType, guid, name, Arrival}
 		}
@@ -90,7 +97,13 @@ func readDeviceInfo(pDevInfo uintptr) (types.DWORD, windows.GUID, string, error)
 	var devName string
 	s := (*reflect.StringHeader)(unsafe.Pointer(&devName))
 	s.Data = pDevInfo + unsafe.Sizeof(devInfo)
-	s.Len = int(uint32(devInfo.size) - uint32(unsafe.Sizeof(devInfo)))
+	read := uint32(devInfo.size)
+	size := uint32(unsafe.Sizeof(devInfo))
+	if read < size {
+		err = fmt.Errorf("read %d bytes, expected at least %d", read, size)
+		return types.DWORD(0), windows.GUID{}, "", err
+	}
+	s.Len = int(read - size)
 	name := strings.ReplaceAll(devName, "\x00", "")
 	name = strings.Replace(name, `\\?\`, "", 1)
 	name = strings.Replace(name, "#", `\`, 2)
