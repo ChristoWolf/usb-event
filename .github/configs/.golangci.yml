@@ -9,3 +9,6 @@ issues:
 linters:
   enable:
     - gosec
+
+run:
+  timeout: 5m
