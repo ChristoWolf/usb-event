@@ -57,15 +57,14 @@ jobs:
       - name: Manually get dependencies
         run: go get -u
 
-      # See https://github.com/golangci/golangci-lint/issues/395#issuecomment-865125535.
-      - name: Force module mode
-        run: set GO111MODULE=on
-
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
+        env:
+          # See https://github.com/golangci/golangci-lint/issues/395#issuecomment-865125535.
+          GO111MODULE: on
         with:
           version: latest
-          args: --config ./.github/configs/.golangci.yml -v
+          args: --config ./.github/configs/.golangci.yml -v --timeout 5m
           only-new-issues: false
           skip-pkg-cache: true
           skip-build-cache: true
