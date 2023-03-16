@@ -27,6 +27,12 @@ func TestNotifierWndProc(t *testing.T) {
 		args     args
 	}{
 		{
+			"no device change",
+			0,
+			0,
+			args{0, 0, 0, 0},
+		},
+		{
 			"device change, no arrival",
 			win.WM_DEVICECHANGE,
 			0,
@@ -38,6 +44,12 @@ func TestNotifierWndProc(t *testing.T) {
 			int(message.DBT_DEVICEARRIVAL),
 			args{0, win.WM_DEVICECHANGE, uintptr(message.DBT_DEVICEARRIVAL), 0},
 		},
+		// {
+		// 	"device change, arrival, data",
+		// 	win.WM_DEVICECHANGE,
+		// 	int(message.DBT_DEVICEARRIVAL),
+		// 	args{0, win.WM_DEVICECHANGE, uintptr(message.DBT_DEVICEARRIVAL), 0},
+		// },
 	}
 	for _, tt := range tests {
 		tt := tt
