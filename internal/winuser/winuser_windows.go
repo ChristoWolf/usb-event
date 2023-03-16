@@ -40,21 +40,15 @@ type Notifier struct {
 
 // WndProc realizes the WNDPROC callback function,
 // see https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wndproc.
-// For now this only supports DBT_DEVICEARRIVAL.
+// For now, this only supports DBT_DEVICEARRIVAL.
 func (n *Notifier) WndProc(hwnd windows.HWND, msg types.DWORD, wParam, lParam uintptr) uintptr {
 	switch msg {
 	case message.WM_DEVICECHANGE:
 		switch wParam {
 		case uintptr(message.DBT_DEVICEARRIVAL):
-			defer func() {
-				if r := recover(); r != nil {
-					n.Channel <- EventInfo{0, windows.GUID{}, "unknown error", Arrival}
-				}
-			}()
 			dType, guid, name, err := readDeviceInfo(lParam)
 			if err != nil {
-				n.Channel <- EventInfo{0, windows.GUID{}, "error: failed to read device information", Arrival}
-				break
+				name = fmt.Sprintf("error: failed to read device information: %s", err)
 			}
 			n.Channel <- EventInfo{dType, guid, name, Arrival}
 		}
@@ -65,7 +59,12 @@ func (n *Notifier) WndProc(hwnd windows.HWND, msg types.DWORD, wParam, lParam ui
 
 // readDeviceInfo parses binary data into a readable form.
 // Based on https://github.com/unreality/nCryptAgent/blob/eecebcab1e366420f6479090b5cfa803f3979f57/deviceevents/events.go#L63.
-func readDeviceInfo(pDevInfo uintptr) (types.DWORD, windows.GUID, string, error) {
+func readDeviceInfo(pDevInfo uintptr) (dtype types.DWORD, guid windows.GUID, name string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
 	var devInfo deviceInfo
 	var devInfoBytes []byte
 	// Do some pointer arithmetic to align the struct.
@@ -76,7 +75,7 @@ func readDeviceInfo(pDevInfo uintptr) (types.DWORD, windows.GUID, string, error)
 	// Read the binary data.
 	r := bytes.NewReader(devInfoBytes)
 	// Windows is little endian.
-	err := binary.Read(r, binary.LittleEndian, &devInfo.size)
+	err = binary.Read(r, binary.LittleEndian, &devInfo.size)
 	if err != nil {
 		return types.DWORD(0), windows.GUID{}, "", err
 	}
@@ -104,7 +103,7 @@ func readDeviceInfo(pDevInfo uintptr) (types.DWORD, windows.GUID, string, error)
 		return types.DWORD(0), windows.GUID{}, "", err
 	}
 	s.Len = int(read - size)
-	name := strings.ReplaceAll(devName, "\x00", "")
+	name = strings.ReplaceAll(devName, "\x00", "")
 	name = strings.Replace(name, `\\?\`, "", 1)
 	name = strings.Replace(name, "#", `\`, 2)
 	name = strings.Split(name, "#")[0]
