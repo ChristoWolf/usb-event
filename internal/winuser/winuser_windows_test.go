@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"reflect"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -15,6 +16,13 @@ import (
 	"github.com/lxn/win"
 	"golang.org/x/sys/windows"
 )
+
+type deviceInfo struct {
+	size       types.DWORD
+	deviceType types.DWORD
+	reserved   types.DWORD
+	classGuid  windows.GUID
+}
 
 // TestNotifierWndProc verifies that the
 // WndProc callback function reacts appropriately
@@ -80,12 +88,6 @@ func TestNotifierWndProc(t *testing.T) {
 func TestNotifierWndProcDataDeviceArrival(t *testing.T) {
 	t.Parallel()
 	n := &winuser.Notifier{make(chan winuser.EventInfo)}
-	type deviceInfo struct {
-		size       types.DWORD
-		deviceType types.DWORD
-		reserved   types.DWORD
-		classGuid  windows.GUID
-	}
 	guid, _ := windows.GUIDFromString("{a5dcbf10-6530-11d2-901f-00c04fb951ed}")
 	devInfo := deviceInfo{
 		size:       220,
@@ -109,7 +111,49 @@ func TestNotifierWndProcDataDeviceArrival(t *testing.T) {
 	go func() {
 		got := <-n.Channel
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("want %v, got: %v", want, got.EventType)
+			t.Errorf("want %v, got: %v", want, got)
+		}
+	}()
+	_ = n.WndProc(0, win.WM_DEVICECHANGE, uintptr(message.DBT_DEVICEARRIVAL), lParam)
+}
+
+// TestNotifierWndProcReadLessBytes verifies that the
+// WndProc callback function does not panic
+// when the data buffer is smaller than the
+// expected size.
+func TestNotifierWndProcReadLessBytes(t *testing.T) {
+	t.Parallel()
+	n := &winuser.Notifier{make(chan winuser.EventInfo)}
+	guid, _ := windows.GUIDFromString("{a5dcbf10-6530-11d2-901f-00c04fb951ed}")
+	devInfo := deviceInfo{
+		size:       20,
+		deviceType: 2,
+		reserved:   0,
+		classGuid:  guid,
+	}
+	name := `USB\VID_1A86&PID_7523\5&2B3E8B8D&0&1`
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+	binary.Write(w, binary.LittleEndian, devInfo)
+	binary.Write(w, binary.LittleEndian, []byte(name))
+	w.Flush()
+	lParam := uintptr(unsafe.Pointer(&b.Bytes()[0]))
+	want := winuser.EventInfo{
+		DeviceType: types.DWORD(0),
+		Guid:       windows.GUID{},
+		DeviceName: "error",
+		EventType:  winuser.EventType(message.DBT_DEVICEARRIVAL),
+	}
+	go func() {
+		got := <-n.Channel
+		if got.DeviceType != want.DeviceType {
+			t.Errorf("want %v, got: %v", want.DeviceType, got.DeviceType)
+		}
+		if got.Guid != want.Guid {
+			t.Errorf("want %v, got: %v", want.Guid, got.Guid)
+		}
+		if !strings.Contains(got.DeviceName, want.DeviceName) {
+			t.Errorf("wanted device name to contain %v, got: %v", want.DeviceName, got.DeviceName)
 		}
 	}()
 	_ = n.WndProc(0, win.WM_DEVICECHANGE, uintptr(message.DBT_DEVICEARRIVAL), lParam)
