@@ -1,6 +1,7 @@
 package usbevent
 
 import (
+	"context"
 	"fmt"
 	"syscall"
 	"unsafe"
@@ -67,13 +68,16 @@ func Register() (*Notifier, error) {
 	return &n, nil
 }
 
-func (n *Notifier) Run() {
-	for {
-		var msg win.MSG
-		got := win.GetMessage(&msg, win.HWND(n.Hwnd), 0, 0)
-		if got == 0 {
-			win.TranslateMessage(&msg)
-			win.DispatchMessage(&msg)
+func (n *Notifier) Run(ctx context.Context) {
+	go func() {
+		for {
+			var msg win.MSG
+			got := win.GetMessage(&msg, win.HWND(n.Hwnd), 0, 0)
+			if got == 0 {
+				win.TranslateMessage(&msg)
+				win.DispatchMessage(&msg)
+			}
 		}
-	}
+	}()
+	<-ctx.Done()
 }
