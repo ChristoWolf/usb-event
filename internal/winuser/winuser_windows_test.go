@@ -93,15 +93,17 @@ func TestNotifierWndProcDataDeviceArrival(t *testing.T) {
 		reserved:   0,
 		classGuid:  guid,
 	}
+	name := `USB\VID_1A86&PID_7523\5&2B3E8B8D&0&1`
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 	binary.Write(w, binary.LittleEndian, devInfo)
+	binary.Write(w, binary.LittleEndian, []byte(name))
 	w.Flush()
 	lParam := uintptr(unsafe.Pointer(&b.Bytes()[0]))
 	want := winuser.EventInfo{
 		DeviceType: devInfo.deviceType,
 		Guid:       guid,
-		DeviceName: "",
+		DeviceName: name,
 		EventType:  winuser.EventType(message.DBT_DEVICEARRIVAL),
 	}
 	go func() {
